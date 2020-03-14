@@ -46,14 +46,16 @@ WEIGHT_VISUALIZE_STEP = 50000
 loss_v = None
 load_net = True
 TRAIN_ON_GPU = True
+
 MAIN_PATH = "../docs/1"
 DATA_LOAD_PATH = MAIN_PATH + "/data"
 NET_SAVE_PATH = MAIN_PATH + "/checkpoint"
 RECORD_SAVE_PATH = MAIN_PATH + "/records"
-NET_FILE = "/checkpoint-1100000.data"
+RUNS_SAVE_PATH = MAIN_PATH + "/runs/" + dt_string
+NET_FILE = "/checkpoint_13_3-1000000.data"
 
 if __name__ == "__main__":
-
+    print(NET_SAVE_PATH + NET_FILE)
     if TRAIN_ON_GPU:
         device = torch.device("cuda")
     else:
@@ -76,7 +78,7 @@ if __name__ == "__main__":
                             actions_n=3, train_on_gpu=TRAIN_ON_GPU, batch_first=True).to(device)
     # load the network
     if load_net is True:
-        with open(os.path.join(NET_SAVE_PATH, NET_FILE), "rb") as f:
+        with open((NET_SAVE_PATH+NET_FILE), "rb") as f:
             checkpoint = torch.load(f)
         net = models.DoubleLSTM(price_input_size=env.price_size, trend_input_size=env.trend_size,
                                 status_size=env.status_size, n_hidden=256, n_layers=2, rnn_drop_prob=0.2, fc_drop_prob=0.2,
@@ -105,7 +107,7 @@ if __name__ == "__main__":
     eval_states = None
     best_mean_val = None
 
-    writer = SummaryWriter(log_dir="../runs/" + dt_string, comment="0005_testing")
+    writer = SummaryWriter(log_dir=RUNS_SAVE_PATH, comment="USDJPY_2020")
     loss_tracker = common.lossTracker(writer, group_losses=100)
     with common.RewardTracker(writer, np.inf, group_rewards=100) as reward_tracker:
         while True:

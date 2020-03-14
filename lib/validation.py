@@ -11,7 +11,7 @@ def validation_run(env, net, episodes, save_path, step_idx, epsilon=0.02, comiss
         'order_profits': [],
         'order_steps': []
     }
-    path_csv = save_path + "/price_" + str(step_idx) + ".csv"
+    path_csv = save_path + "/record_" + str(step_idx) + ".csv"
     df = pd.DataFrame(
         columns=['episode', 'buy_date', 'buy_position', 'sell_date', 'sell_position','position_steps', 'order_profit'])
     df_row = pd.DataFrame(data=np.full((1, 7), ''),
