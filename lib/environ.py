@@ -31,6 +31,7 @@ class State:
         self.reward_on_close = reward_on_close
         self.volumes = volumes
         self.train_mode = train_mode
+        self.order_step = 0.0 # for step counter from buy to sell (buy date = step 1, if sell date = 4, time cost = 3)
 
     def reset(self, data, date, extra_set, offset):
         assert isinstance(data, dict)
@@ -125,7 +126,7 @@ class State:
                 shift_c += 1
             shift_r += 1
         # status stacking
-        status[0,0] = float(self.have_position)
+        status[0,0] = (1/(1+399*np.exp((-self.order_step)/8))) - (1/400)
         if not self.have_position:
             status[0,1] = 0.0
         else:
@@ -151,6 +152,10 @@ class State:
         rel_close = self._data['close'][self._offset]
         return open * (1.0 + rel_close)
 
+    def time_cost(self,steps):
+        one_step_cost = steps*(0.2/(1+399*np.exp((-steps)/8))) # max 0.2% cost for a step holding
+        return one_step_cost
+
     def step(self, action):
         """
         Perform one step in our price, adjust offset, check for the end of prices
@@ -174,6 +179,7 @@ class State:
                 reward += 100.0 * (close - self.open_price) / self.open_price
             self.have_position = False
             self.open_price = 0.0
+            self.order_step = 0.0
 
         self._offset += 1
         prev_close = close
@@ -182,6 +188,9 @@ class State:
 
         if self.have_position and not self.reward_on_close:
             reward += 100.0 * (close - prev_close) / prev_close # change with respect to last day close-price
+            self.order_step += 1
+            one_step_cost = self.time_cost(self.order_step)  # cal the time cost
+            reward -= one_step_cost
 
         return reward, done
 
