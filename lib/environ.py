@@ -153,7 +153,7 @@ class State:
         return open * (1.0 + rel_close)
 
     def time_cost(self,steps):
-        one_step_cost = steps*(0.2/(1+399*np.exp((-steps)/8))) # max 0.2% cost for a step holding
+        one_step_cost = 0.2/(1+399*np.exp((-steps)/8)) # max 0.2% cost for a step holding
         return one_step_cost
 
     def step(self, action):

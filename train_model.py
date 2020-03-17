@@ -44,10 +44,10 @@ VALIDATION_EVERY_STEP = 30000 # 30000
 WEIGHT_VISUALIZE_STEP = 50000
 
 loss_v = None
-load_net = True
+load_net = False
 TRAIN_ON_GPU = True
 
-MAIN_PATH = "../docs/2"
+MAIN_PATH = "../docs/3"
 DATA_LOAD_PATH = MAIN_PATH + "/data"
 NET_SAVE_PATH = MAIN_PATH + "/checkpoint"
 RECORD_SAVE_PATH = MAIN_PATH + "/records"
@@ -113,7 +113,7 @@ if __name__ == "__main__":
             step_idx += 1
             net_processor.populate_mode(batch_size=1)
             buffer.populate(1)
-            selector.epsilon = max(EPSILON_STOP, EPSILON_START - step_idx*1.25 / EPSILON_STEPS)
+            selector.epsilon = max(EPSILON_STOP, EPSILON_START - step_idx*0.75 / EPSILON_STEPS)
 
             new_rewards = exp_source.pop_rewards_steps()
             if new_rewards:
@@ -150,7 +150,7 @@ if __name__ == "__main__":
                 validation_episodes = min(np.int((1/1800)*step_idx + 100), MAX_VALIDATION_EPISODES)
                 writer.add_scalar("validation_episodes", validation_episodes, step_idx)
 
-                val_epsilon = max(0, EPSILON_START - step_idx * 1.25 / EPSILON_STEPS)
+                val_epsilon = max(0, EPSILON_START - step_idx * 0.75 / EPSILON_STEPS)
                 stats = validation.validation_run(env_val, net, episodes=validation_episodes,
                                                   save_path=RECORD_SAVE_PATH, step_idx=step_idx, epsilon=val_epsilon)
                 common.valid_result_visualize(stats, writer, step_idx)
