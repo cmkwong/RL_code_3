@@ -27,7 +27,7 @@ GAMMA = 0.99
 REPLAY_SIZE = 100000 # 100000
 REPLAY_INITIAL = 10000 # 10000
 
-REWARD_STEPS = 2
+REWARD_STEPS = 6
 
 LEARNING_RATE = 0.00001
 
@@ -47,7 +47,7 @@ loss_v = None
 load_net = False
 TRAIN_ON_GPU = True
 
-MAIN_PATH = "../docs/3"
+MAIN_PATH = "../docs/4"
 DATA_LOAD_PATH = MAIN_PATH + "/data"
 NET_SAVE_PATH = MAIN_PATH + "/checkpoint"
 RECORD_SAVE_PATH = MAIN_PATH + "/records"
