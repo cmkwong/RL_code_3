@@ -27,9 +27,9 @@ GAMMA = 0.99
 REPLAY_SIZE = 100000 # 100000
 REPLAY_INITIAL = 10000 # 10000
 
-REWARD_STEPS = 6
+REWARD_STEPS = 2
 
-LEARNING_RATE = 0.00001
+LEARNING_RATE = 0.000005
 
 STATES_TO_EVALUATE = 1000
 EVAL_EVERY_STEP = 1000
@@ -44,15 +44,15 @@ VALIDATION_EVERY_STEP = 30000 # 30000
 WEIGHT_VISUALIZE_STEP = 50000
 
 loss_v = None
-load_net = False
+load_net = True
 TRAIN_ON_GPU = True
 
-MAIN_PATH = "../docs/4"
+MAIN_PATH = "../docs/5"
 DATA_LOAD_PATH = MAIN_PATH + "/data"
 NET_SAVE_PATH = MAIN_PATH + "/checkpoint"
 RECORD_SAVE_PATH = MAIN_PATH + "/records"
 RUNS_SAVE_PATH = MAIN_PATH + "/runs/" + dt_string
-NET_FILE = "checkpoint_13_3-1000000.data"
+NET_FILE = "3_checkpoint-2300000.data"
 
 if __name__ == "__main__":
     if TRAIN_ON_GPU:
