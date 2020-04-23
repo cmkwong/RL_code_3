@@ -47,12 +47,12 @@ loss_v = None
 load_net = True
 TRAIN_ON_GPU = True
 
-MAIN_PATH = "../docs/5"
+MAIN_PATH = "../docs/6"
 DATA_LOAD_PATH = MAIN_PATH + "/data"
 NET_SAVE_PATH = MAIN_PATH + "/checkpoint"
 RECORD_SAVE_PATH = MAIN_PATH + "/records"
 RUNS_SAVE_PATH = MAIN_PATH + "/runs/" + dt_string
-NET_FILE = "3_checkpoint-2300000.data"
+NET_FILE = "checkpoint-2250000.data"
 
 if __name__ == "__main__":
     if TRAIN_ON_GPU:
@@ -72,14 +72,14 @@ if __name__ == "__main__":
     # env_val = wrappers.TimeLimit(env_val, max_episode_steps=1000)
 
     # create neural network
-    net = models.DoubleLSTM(price_input_size=env.price_size, trend_input_size=env.trend_size,
+    net = models.DoubleLSTM_2(price_input_size=env.price_size, trend_input_size=env.trend_size,
                             status_size=env.status_size, n_hidden=256, n_layers=2, rnn_drop_prob=0.2, fc_drop_prob=0.2,
                             actions_n=3, train_on_gpu=TRAIN_ON_GPU, batch_first=True).to(device)
     # load the network
     if load_net is True:
         with open(os.path.join(NET_SAVE_PATH, NET_FILE), "rb") as f:
             checkpoint = torch.load(f)
-        net = models.DoubleLSTM(price_input_size=env.price_size, trend_input_size=env.trend_size,
+        net = models.DoubleLSTM_2(price_input_size=env.price_size, trend_input_size=env.trend_size,
                                 status_size=env.status_size, n_hidden=256, n_layers=2, rnn_drop_prob=0.2, fc_drop_prob=0.2,
                                 actions_n=3, train_on_gpu=TRAIN_ON_GPU, batch_first=True).to(device)
         net.load_state_dict(checkpoint['state_dict'])

@@ -382,3 +382,194 @@ class DQNConv1DLarge(nn.Module):
         val = self.fc_val(conv_out)
         adv = self.fc_adv(conv_out)
         return val + adv - adv.mean(dim=1, keepdim=True)
+
+
+class DoubleLSTM_2(nn.Module):
+    def __init__(self, price_input_size, trend_input_size, status_size, n_hidden=256, n_layers=2, rnn_drop_prob=0.2, fc_drop_prob=0.2, actions_n=3,
+                 train_on_gpu=True, batch_first=True):
+        super(DoubleLSTM_2, self).__init__()
+        self.price_input_size = price_input_size
+        self.trend_input_size = int(trend_input_size/4)
+        self.status_size = status_size
+        self.n_hidden = n_hidden
+        self.n_layers = n_layers
+        self.rnn_drop_prob = rnn_drop_prob
+        self.fc_drop_prob = fc_drop_prob
+        self.actions_n = actions_n
+        self.train_on_gpu = train_on_gpu
+        self.embedding_size = 64
+        if self.train_on_gpu:
+            self.device = torch.device("cuda")
+        else:
+            self.device = torch.device("cpu")
+        self.batch_first = batch_first
+        self.batch_size = None
+
+        self.price_lstm = nn.LSTM(self.price_input_size, self.n_hidden, self.n_layers, dropout=self.rnn_drop_prob,
+                                  batch_first=self.batch_first)
+
+        self.trend_1_lstm = nn.LSTM(self.trend_input_size, self.embedding_size, self.n_layers, dropout=self.rnn_drop_prob,
+                                    batch_first=self.batch_first)
+        self.trend_2_lstm = nn.LSTM(self.trend_input_size, self.embedding_size, self.n_layers, dropout=self.rnn_drop_prob,
+                                    batch_first=self.batch_first)
+        self.trend_3_lstm = nn.LSTM(self.trend_input_size, self.embedding_size, self.n_layers, dropout=self.rnn_drop_prob,
+                                    batch_first=self.batch_first)
+        self.trend_4_lstm = nn.LSTM(self.trend_input_size, self.embedding_size, self.n_layers, dropout=self.rnn_drop_prob,
+                                    batch_first=self.batch_first)
+
+        # for state value
+        self.fc_val = nn.Sequential(
+            nn.Linear(self.n_hidden + self.embedding_size*4 + self.status_size, 1024),
+            nn.ReLU(),
+            nn.Dropout(p=self.fc_drop_prob),
+            nn.Linear(1024, 1024),
+            nn.ReLU(),
+            nn.Dropout(p=self.fc_drop_prob),
+            nn.Linear(1024, 512),
+            nn.ReLU(),
+            nn.Dropout(p=self.fc_drop_prob),
+            nn.Linear(512, 512),
+            nn.ReLU(),
+            nn.Dropout(p=self.fc_drop_prob),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, 1)
+        )
+        # for action value
+        self.fc_adv = nn.Sequential(
+            nn.Linear(self.n_hidden + self.embedding_size*4 + self.status_size, 1024),
+            nn.ReLU(),
+            nn.Dropout(p=self.fc_drop_prob),
+            nn.Linear(1024, 1024),
+            nn.ReLU(),
+            nn.Dropout(p=self.fc_drop_prob),
+            nn.Linear(1024, 512),
+            nn.ReLU(),
+            nn.Dropout(p=self.fc_drop_prob),
+            nn.Linear(512, 512),
+            nn.ReLU(),
+            nn.Dropout(p=self.fc_drop_prob),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, self.actions_n)
+        )
+
+        self.hidden_p = None
+        self.hidden_1_t = None
+        self.hidden_2_t = None
+        self.hidden_3_t = None
+        self.hidden_4_t = None
+
+    def preprocessor(self, x): # dtype = torch.float32 must be set
+        price_data = None
+        trend_data = None
+        trend_1_data = None
+        trend_2_data = None
+        trend_3_data = None
+        trend_4_data = None
+        status_data = None
+        if len(x) == 1: # no batch
+            price_data = torch.tensor(x[0].data[:,:self.price_input_size], dtype=torch.float32).view(1, -1, self.price_input_size).to(self.device)   # data.shape = (1, 40, 4)
+            trend_1_data = torch.tensor(x[0].data[:,self.price_input_size], dtype=torch.float32).view(1, -1, 1).to(self.device)   # data.shape = (1, 40, 4)
+            trend_2_data = torch.tensor(x[0].data[:, self.price_input_size+1], dtype=torch.float32).view(1, -1, 1).to(self.device)  # data.shape = (1, 40, 4)
+            trend_3_data = torch.tensor(x[0].data[:, self.price_input_size+2], dtype=torch.float32).view(1, -1, 1).to(self.device)  # data.shape = (1, 40, 4)
+            trend_4_data = torch.tensor(x[0].data[:, self.price_input_size+3], dtype=torch.float32).view(1, -1, 1).to(self.device)  # data.shape = (1, 40, 4)
+            status_data = torch.tensor(x[0].status, dtype=torch.float32).to(self.device)                                       # status.shape = (1,2)
+        elif len(x) > 1: # batch
+            price_data_shape = (self.batch_size, x[0].data.shape[0], self.price_input_size) # data.shape = (batch_size, 40, 4)
+            trend_data_shape = (self.batch_size, x[0].data.shape[0], 1)  # data.shape = (batch_size, 40, 1)
+            status_shape = (self.batch_size, x[0].status.shape[1])  # status.shape = (batch_size,2)
+            price_data = torch.zeros(size=price_data_shape, dtype=torch.float32).to(self.device)
+            trend_1_data = torch.zeros(size=trend_data_shape, dtype=torch.float32).to(self.device)
+            trend_2_data = torch.zeros(size=trend_data_shape, dtype=torch.float32).to(self.device)
+            trend_3_data = torch.zeros(size=trend_data_shape, dtype=torch.float32).to(self.device)
+            trend_4_data = torch.zeros(size=trend_data_shape, dtype=torch.float32).to(self.device)
+            status_data = torch.zeros(size=status_shape, dtype=torch.float32).to(self.device)
+            for idx, exp in enumerate(x):
+                price_data[idx, :, :] = torch.tensor(x[idx].data[:,:self.price_input_size])
+                trend_1_data[idx, :, :] = torch.tensor(x[idx].data[:, self.price_input_size]).view(-1, 1)
+                trend_2_data[idx, :, :] = torch.tensor(x[idx].data[:, self.price_input_size+1]).view(-1, 1)
+                trend_3_data[idx, :, :] = torch.tensor(x[idx].data[:, self.price_input_size+2]).view(-1, 1)
+                trend_4_data[idx, :, :] = torch.tensor(x[idx].data[:, self.price_input_size+3]).view(-1, 1)
+                status_data[idx, :] = torch.tensor(x[idx].status)
+
+        return price_data, trend_1_data, trend_2_data, trend_3_data, trend_4_data, status_data
+
+    def forward(self, x):
+        price, trend_1, trend_2, trend_3, trend_4, status = self.preprocessor(x)
+
+        self.hidden_p = tuple([each.data for each in self.hidden_p])
+        self.price_lstm.flatten_parameters()
+        price_output, self.hidden_p = self.price_lstm(price, self.hidden_p)
+
+        self.hidden_1_t = tuple([each.data for each in self.hidden_1_t])
+        self.trend_1_lstm.flatten_parameters()
+        trend_1_output, self.hidden_1_t = self.trend_1_lstm(trend_1, self.hidden_1_t)
+
+        self.hidden_2_t = tuple([each.data for each in self.hidden_2_t])
+        self.trend_2_lstm.flatten_parameters()
+        trend_2_output, self.hidden_2_t = self.trend_2_lstm(trend_2, self.hidden_2_t)
+
+        self.hidden_3_t = tuple([each.data for each in self.hidden_3_t])
+        self.trend_3_lstm.flatten_parameters()
+        trend_3_output, self.hidden_3_t = self.trend_3_lstm(trend_3, self.hidden_3_t)
+
+        self.hidden_4_t = tuple([each.data for each in self.hidden_4_t])
+        self.trend_4_lstm.flatten_parameters()
+        trend_4_output, self.hidden_4_t = self.trend_4_lstm(trend_4, self.hidden_4_t)
+
+        # only need the last cell output
+        price_output_ = price_output[:,-1,:]
+        trend_1_output_ = trend_1_output[:, -1, :]
+        trend_2_output_ = trend_2_output[:, -1, :]
+        trend_3_output_ = trend_3_output[:, -1, :]
+        trend_4_output_ = trend_4_output[:, -1, :]
+        price_output_ = price_output_.view(self.batch_size, -1)
+        trend_1_output_ = trend_1_output_.view(self.batch_size, -1)
+        trend_2_output_ = trend_2_output_.view(self.batch_size, -1)
+        trend_3_output_ = trend_3_output_.view(self.batch_size, -1)
+        trend_4_output_ = trend_4_output_.view(self.batch_size, -1)
+        output = torch.cat([price_output_, trend_1_output_,trend_2_output_,trend_3_output_,trend_4_output_, status], dim=1) # shape = po(batch_size, 256) + to(batch_size, 256) + status(batch_size, 2) = (batch_size,514)
+
+        val = self.fc_val(output)
+        adv = self.fc_adv(output)
+
+        return val + adv - adv.mean(dim=1, keepdim=True)
+
+    def init_hidden(self, batch_size):
+        ''' Initializes hidden state '''
+        # Create two new tensors with sizes n_layers x batch_size x n_hidden,
+        # initialized to zero, for hidden state and cell state of LSTM
+        self.batch_size = batch_size
+        if (self.train_on_gpu):
+            weight = next(self.parameters()).data
+            self.hidden_p = (weight.new_zeros(self.n_layers, batch_size, self.n_hidden).cuda(),
+                      weight.new_zeros(self.n_layers, batch_size, self.n_hidden).cuda())
+            weight = next(self.parameters()).data
+            self.hidden_1_t = (weight.new_zeros(self.n_layers, batch_size, self.embedding_size).cuda(),
+                           weight.new_zeros(self.n_layers, batch_size, self.embedding_size).cuda())
+            self.hidden_2_t = (weight.new_zeros(self.n_layers, batch_size, self.embedding_size).cuda(),
+                             weight.new_zeros(self.n_layers, batch_size, self.embedding_size).cuda())
+            self.hidden_3_t = (weight.new_zeros(self.n_layers, batch_size, self.embedding_size).cuda(),
+                             weight.new_zeros(self.n_layers, batch_size, self.embedding_size).cuda())
+            self.hidden_4_t = (weight.new_zeros(self.n_layers, batch_size, self.embedding_size).cuda(),
+                             weight.new_zeros(self.n_layers, batch_size, self.embedding_size).cuda())
+        else:
+            weight = next(self.parameters()).data
+            self.hidden_p = (weight.new_zeros(self.n_layers, batch_size, self.n_hidden),
+                      weight.new_zeros(self.n_layers, batch_size, self.n_hidden))
+            weight = next(self.parameters()).data
+            self.hidden_1_t = (weight.new_zeros(self.n_layers, batch_size, self.embedding_size),
+                           weight.new_zeros(self.n_layers, batch_size, self.embedding_size))
+            self.hidden_2_t = (weight.new_zeros(self.n_layers, batch_size, self.embedding_size),
+                             weight.new_zeros(self.n_layers, batch_size, self.embedding_size))
+            self.hidden_3_t = (weight.new_zeros(self.n_layers, batch_size, self.embedding_size),
+                             weight.new_zeros(self.n_layers, batch_size, self.embedding_size))
+            self.hidden_4_t = (weight.new_zeros(self.n_layers, batch_size, self.embedding_size),
+                             weight.new_zeros(self.n_layers, batch_size, self.embedding_size))
+
+
