@@ -287,18 +287,18 @@ class DoubleLSTM(nn.Module):
         self.batch_size = batch_size
         if (self.train_on_gpu):
             weight = next(self.parameters()).data
-            self.hidden_p = (weight.new_zeros(self.n_layers, batch_size, self.n_hidden).cuda(),
-                      weight.new_zeros(self.n_layers, batch_size, self.n_hidden).cuda())
+            self.hidden_p = (weight.new_zeros([self.n_layers, batch_size, self.n_hidden]).cuda(),
+                      weight.new_zeros([self.n_layers, batch_size, self.n_hidden]).cuda())
             weight = next(self.parameters()).data
-            self.hidden_t = (weight.new_zeros(self.n_layers, batch_size, self.n_hidden).cuda(),
-                           weight.new_zeros(self.n_layers, batch_size, self.n_hidden).cuda())
+            self.hidden_t = (weight.new_zeros([self.n_layers, batch_size, self.n_hidden]).cuda(),
+                           weight.new_zeros([self.n_layers, batch_size, self.n_hidden]).cuda())
         else:
             weight = next(self.parameters()).data
-            self.hidden_p = (weight.new_zeros(self.n_layers, batch_size, self.n_hidden),
-                      weight.new_zeros(self.n_layers, batch_size, self.n_hidden))
+            self.hidden_p = (weight.new_zeros([self.n_layers, batch_size, self.n_hidden]),
+                      weight.new_zeros([self.n_layers, batch_size, self.n_hidden]))
             weight = next(self.parameters()).data
-            self.hidden_t = (weight.new_zeros(self.n_layers, batch_size, self.n_hidden),
-                           weight.new_zeros(self.n_layers, batch_size, self.n_hidden))
+            self.hidden_t = (weight.new_zeros([self.n_layers, batch_size, self.n_hidden]),
+                           weight.new_zeros([self.n_layers, batch_size, self.n_hidden]))
 
 class DQNConv1D(nn.Module):
     def __init__(self, shape, actions_n):

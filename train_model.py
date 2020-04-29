@@ -16,7 +16,7 @@ from datetime import datetime
 now = datetime.now()
 dt_string = now.strftime("%y%m%d_%H%M%S")
 
-BATCH_SIZE = 32
+BATCH_SIZE = 64
 BARS_COUNT = 20
 TARGET_NET_SYNC = 1000
 TRAINING_DATA = ""
@@ -29,7 +29,11 @@ REPLAY_INITIAL = 10000 # 10000
 
 REWARD_STEPS = 2
 
+<<<<<<< HEAD
 LEARNING_RATE = 0.00001
+=======
+LEARNING_RATE = 0.00002
+>>>>>>> 48b9221980db222909420e1d23987d456ca4c2a6
 
 STATES_TO_EVALUATE = 1000
 EVAL_EVERY_STEP = 1000
@@ -47,12 +51,20 @@ loss_v = None
 load_net = False
 TRAIN_ON_GPU = True
 
+<<<<<<< HEAD
 MAIN_PATH = "../docs/8"
+=======
+MAIN_PATH = "../docs/10"
+>>>>>>> 48b9221980db222909420e1d23987d456ca4c2a6
 DATA_LOAD_PATH = MAIN_PATH + "/data"
 NET_SAVE_PATH = MAIN_PATH + "/checkpoint"
 RECORD_SAVE_PATH = MAIN_PATH + "/records"
 RUNS_SAVE_PATH = MAIN_PATH + "/runs/" + dt_string
+<<<<<<< HEAD
 NET_FILE = "checkpoint_13_3-1000000.data"
+=======
+NET_FILE = "checkpoint-2200000.data"
+>>>>>>> 48b9221980db222909420e1d23987d456ca4c2a6
 
 if __name__ == "__main__":
     if TRAIN_ON_GPU:
