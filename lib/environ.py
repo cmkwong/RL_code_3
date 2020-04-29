@@ -14,7 +14,9 @@ DEFAULT_COMMISSION_PERC = 0.1
 class Actions(enum.Enum):
     Skip = 0
     Buy = 1
-    Close = 2
+    Sell = 2
+    Buy_close = 3
+    Sell_close = 4
 
 
 class State:
@@ -36,7 +38,8 @@ class State:
     def reset(self, data, date, extra_set, offset):
         assert isinstance(data, dict)
         assert offset >= self.bars_count - 1
-        self.have_position = False
+        self.neg_position = False
+        self.pos_position = False
         self.open_price = 0.0
         self._data = data
         self._date = date
@@ -89,7 +92,7 @@ class State:
 
     @property
     def shape_status(self):
-        self.base_status_size = 2
+        self.base_status_size = 4
         self.extra_status_size = 0
         if len(self._extra_set) is not 0:
             if len(self._extra_set['status']) is not 0:
@@ -126,11 +129,18 @@ class State:
                 shift_c += 1
             shift_r += 1
         # status stacking
-        status[0,0] = (1/(1+399*np.exp((-self.order_step)/8))) - (1/400)
-        if not self.have_position:
-            status[0,1] = 0.0
+        if not self.pos_position:       # if no buy position, then 0
+            status[0, 0] = 0.0
+            status[0, 1] = 0.0
         else:
-            status[0,1] = (self._data['close'][self._offset] - self.open_price) / self.open_price
+            status[0, 0] = (1 / (1 + 399 * np.exp((-self.order_step) / 8))) - (1 / 400)     # else not 0
+            status[0, 1] = (self._data['close'][self._offset] - self.open_price) / self.open_price
+        if not self.neg_position:       # if no sell position, then 0
+            status[0, 2] = 0.0
+            status[0, 3] = 0.0
+        else:
+            status[0, 2] = (1 / (1 + 399 * np.exp((-self.order_step) / 8))) - (1 / 400)     # else not 0
+            status[0, 3] = (-1) * (self._data['close'][self._offset] - self.open_price) / self.open_price
 
         # extra_data
         normal_array = np.ndarray(shape=(self.bars_count, self.extra_trend_size), dtype=np.float64)
@@ -168,30 +178,59 @@ class State:
         done = False
         # don't need self._cur_close() because it is not relative price
         close = self._data['close'][self._offset]
-        if action == Actions.Buy and not self.have_position:
-            self.have_position = True
+        if action == Actions.Buy and not self.pos_position and not self.neg_position:       # buy
+            self.pos_position = True
             self.open_price = close
             reward -= self.commission_perc
-        elif action == Actions.Close and self.have_position:
+        if action == Actions.Sell and not self.pos_position and not self.neg_position:      # sell
+            self.neg_position = True
+            self.open_price = close
+            reward -= self.commission_perc
+        elif action == Actions.Buy_close and self.pos_position and not self.neg_position:   # buy close
             reward -= self.commission_perc
             done |= self.reset_on_close                     # done if reset_on_close
             if self.reward_on_close:
                 reward += 100.0 * (close - self.open_price) / self.open_price
-            self.have_position = False
+            self.pos_position = False
             self.open_price = 0.0
             self.order_step = 0.0
+        elif action == Actions.Sell_close and not self.pos_position and self.neg_position:  # sell close
+            reward -= self.commission_perc
+            done |= self.reset_on_close                     # done if reset_on_close
+            if self.reward_on_close:
+                reward += (-1) * 100.0 * (close - self.open_price) / self.open_price
+            self.neg_position = False
+            self.open_price = 0.0
+            self.order_step = 0.0
+        # setting the penalty of wrong action
+        elif action == Actions.Buy and self.pos_position:       # Buy when has pos_position (-5%)
+            reward = reward-0.05
+        elif action == Actions.Buy and self.neg_position:       # Buy when has neg_position (-5%)
+            reward = reward-0.05
+        elif action == Actions.Sell and self.pos_position:     # Sell when has pos_position (-5%)
+            reward = reward-0.05
+        elif action == Actions.Sell and self.neg_position:     # Sell when has neg_position (-5%)
+            reward = reward-0.05
+        elif action == Actions.Buy_close and not self.pos_position:     # Buy_close when no pos_position (-5%)
+            reward = reward-0.05
+        elif action == Actions.Sell_close and not self.neg_position:     # Sell_close when no neg_position (-5%)
+            reward = reward-0.05
 
         self._offset += 1
         prev_close = close
         close = self._data['close'][self._offset]
         done |= self._offset >= self._data['close'].shape[0]-1 # done if reached limit
 
-        if self.have_position and not self.reward_on_close:
+        if self.pos_position and not self.reward_on_close:      # calculate the reward when Action = None im pos_position
             reward += 100.0 * (close - prev_close) / prev_close # change with respect to last day close-price
             self.order_step += 1
             one_step_cost = self.time_cost(self.order_step)  # cal the time cost
             reward -= one_step_cost
-
+        elif self.neg_position and not self.reward_on_close:    # calculate the reward when Action = None im neg_position
+            reward += (-1) * 100.0 * (close - prev_close) / prev_close  # change with respect to last day close-price
+            self.order_step += 1
+            one_step_cost = self.time_cost(self.order_step)  # cal the time cost
+            reward -= one_step_cost
         return reward, done
 
 

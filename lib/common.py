@@ -80,10 +80,6 @@ class lossTracker:
         if len(self.total_loss) > self.capacity:
             self.total_loss = self.total_loss[1:]
 
-        if frame % 20000 == 0:
-            print("The mean loss is %.2f and the current loss is %.2f" %(
-                movingAverage_loss, mean_loss
-            ))
         self.writer.add_scalar("loss_100", movingAverage_loss, frame)
         self.writer.add_scalar("loss", mean_loss, frame)
 
@@ -180,3 +176,4 @@ def valid_result_visualize(stats=None, writer=None, step_idx=None):
                 writer.add_histogram(key + "_val", 0)
 
     # output the reward distribution to the writer
+

@@ -165,7 +165,7 @@ class SimpleLSTM(nn.Module):
                       weight.new_zeros(self.n_layers, batch_size, self.n_hidden))
 
 class DoubleLSTM(nn.Module):
-    def __init__(self, price_input_size, trend_input_size, status_size, n_hidden=256, n_layers=2, rnn_drop_prob=0.2, fc_drop_prob=0.2, actions_n=3,
+    def __init__(self, price_input_size, trend_input_size, status_size, n_hidden=256, n_layers=2, rnn_drop_prob=0.2, fc_drop_prob=0.2, actions_n=5,
                  train_on_gpu=True, batch_first=True):
         super(DoubleLSTM, self).__init__()
         self.price_input_size = price_input_size

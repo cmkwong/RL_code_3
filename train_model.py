@@ -29,13 +29,13 @@ REPLAY_INITIAL = 10000 # 10000
 
 REWARD_STEPS = 2
 
-LEARNING_RATE = 0.000005
+LEARNING_RATE = 0.00001
 
 STATES_TO_EVALUATE = 1000
 EVAL_EVERY_STEP = 1000
 
 EPSILON_START = 0.9
-EPSILON_STOP = 0.05
+EPSILON_STOP = 0.15
 EPSILON_STEPS = 1000000
 MAX_VALIDATION_EPISODES = 600
 
@@ -44,15 +44,15 @@ VALIDATION_EVERY_STEP = 30000 # 30000
 WEIGHT_VISUALIZE_STEP = 50000
 
 loss_v = None
-load_net = True
+load_net = False
 TRAIN_ON_GPU = True
 
-MAIN_PATH = "../docs/5"
+MAIN_PATH = "../docs/8"
 DATA_LOAD_PATH = MAIN_PATH + "/data"
 NET_SAVE_PATH = MAIN_PATH + "/checkpoint"
 RECORD_SAVE_PATH = MAIN_PATH + "/records"
 RUNS_SAVE_PATH = MAIN_PATH + "/runs/" + dt_string
-NET_FILE = "3_checkpoint-2300000.data"
+NET_FILE = "checkpoint_13_3-1000000.data"
 
 if __name__ == "__main__":
     if TRAIN_ON_GPU:
@@ -74,14 +74,14 @@ if __name__ == "__main__":
     # create neural network
     net = models.DoubleLSTM(price_input_size=env.price_size, trend_input_size=env.trend_size,
                             status_size=env.status_size, n_hidden=256, n_layers=2, rnn_drop_prob=0.2, fc_drop_prob=0.2,
-                            actions_n=3, train_on_gpu=TRAIN_ON_GPU, batch_first=True).to(device)
+                            actions_n=5, train_on_gpu=TRAIN_ON_GPU, batch_first=True).to(device)
     # load the network
     if load_net is True:
         with open(os.path.join(NET_SAVE_PATH, NET_FILE), "rb") as f:
             checkpoint = torch.load(f)
         net = models.DoubleLSTM(price_input_size=env.price_size, trend_input_size=env.trend_size,
                                 status_size=env.status_size, n_hidden=256, n_layers=2, rnn_drop_prob=0.2, fc_drop_prob=0.2,
-                                actions_n=3, train_on_gpu=TRAIN_ON_GPU, batch_first=True).to(device)
+                                actions_n=5, train_on_gpu=TRAIN_ON_GPU, batch_first=True).to(device)
         net.load_state_dict(checkpoint['state_dict'])
 
     tgt_net = ptan.agent.TargetNet(net)
@@ -105,6 +105,9 @@ if __name__ == "__main__":
         step_idx = 0
     eval_states = None
     best_mean_val = None
+
+    # create the validator
+    validator = validation.validator(env_val, net, save_path=RECORD_SAVE_PATH, comission=0.1)
 
     writer = SummaryWriter(log_dir=RUNS_SAVE_PATH, comment="USDJPY_2020")
     loss_tracker = common.lossTracker(writer, group_losses=100)
@@ -151,8 +154,7 @@ if __name__ == "__main__":
                 writer.add_scalar("validation_episodes", validation_episodes, step_idx)
 
                 val_epsilon = max(0, EPSILON_START - step_idx * 0.75 / EPSILON_STEPS)
-                stats = validation.validation_run(env_val, net, episodes=validation_episodes,
-                                                  save_path=RECORD_SAVE_PATH, step_idx=step_idx, epsilon=val_epsilon)
+                stats = validator.run(episodes=validation_episodes, step_idx=step_idx, epsilon=val_epsilon)
                 common.valid_result_visualize(stats, writer, step_idx)
 
             if step_idx % WEIGHT_VISUALIZE_STEP == 0:
