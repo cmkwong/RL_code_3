@@ -104,24 +104,33 @@ def load_fileList(path):
     file_list = os.listdir(path)
     return file_list, path
 
-def addition_indicators(prices, trend_names, status_names):
+def addition_indicators(prices, trend_names, status_names, iamge_names):
     trend_indicators = OrderedDict()
     status_indicators = OrderedDict()
+    image_indicators = OrderedDict()
     if trend_names is not None:
         for trend_name in trend_names:
             if trend_name == 'bollinger_bands':
                 trend_indicators[trend_name] = indicators.Bollinger_Bands(prices, period=20, upperB_p=2, lowerB_p=2)
+                trend_indicators[trend_name].cal_data()
             if trend_name == 'MACD':
                 trend_indicators[trend_name] = indicators.MACD(prices, period=(12,26), ma_p=9)
+                trend_indicators[trend_name].cal_data()
             if trend_name == 'RSI':
                 trend_indicators[trend_name] = indicators.RSI(prices, period=14)
+                trend_indicators[trend_name].cal_data()
     if status_names is not None:
         for status_name in status_names:
             if status_name == 'RSI':
                 status_indicators[status_name] = indicators.RSI(prices, period=14)
-    return trend_indicators, status_indicators
+    if iamge_names is not None:
+        for iamge_name in iamge_names:
+            if iamge_name == 'MA':
+                image_indicators[iamge_name] = indicators.moving_average(prices, periods=[i for i in range(1, 101)])
+                image_indicators[iamge_name].cal_data()
+    return trend_indicators, status_indicators, image_indicators
 
-def data_regularize(prices, trend_indicators, status_indicators):
+def data_regularize(prices, trend_indicators, status_indicators): # disabled
     assert(isinstance(prices, dict))
     assert (isinstance(trend_indicators, dict))
     assert (isinstance(status_indicators, dict))
@@ -138,14 +147,17 @@ def data_regularize(prices, trend_indicators, status_indicators):
         prices.update(required_data)
     return prices
 
-def update_cutoff(trend_indicators, status_indicators, offset):
+def update_cutoff(trend_indicators, status_indicators, twod_indicators, offset):
     # update the cutoff offset for each indicators
     for key in list(trend_indicators.keys()):
         trend_indicators[key].cutoff = offset
     for key in list(status_indicators.keys()):
         status_indicators[key].cutoff = offset
+    for key in list(twod_indicators.keys()):
+        twod_indicators[key].cutoff = offset
 
-def read_bundle_csv(path, sep=',', filter_data=True, fix_open_price=False, percentage=0.8, extra_indicator=False, trend_names=None, status_names=None):
+def read_bundle_csv(path, sep=',', filter_data=True, fix_open_price=False, percentage=0.8, extra_indicator=False,
+                    trend_names=None, status_names=None, image_names=None):
     reader = csv_reader()
     spliter = SimpleSpliter()
     train_set = {}
@@ -155,20 +167,21 @@ def read_bundle_csv(path, sep=',', filter_data=True, fix_open_price=False, perce
     extra_set = {}
     file_list = os.listdir(path)
     for file_name in file_list:
-        indicator_dicts = {} # extra_set = {"0005.HK": {"trend", "status"}, "0011.HK": {"trend", "status"}, ...}
+        indicator_dicts = {} # extra_set = {"0005.HK": {"trend", "status", "image"}, "0011.HK": {"trend", "status", "image"}, ...}
         required_path = path + "/" + file_name
         dates, prices = reader.read_csv(required_path, sep=sep, filter_data=filter_data, fix_open_price=fix_open_price)
         if extra_indicator:
-            indicator_dicts['trend'], indicator_dicts['status'] = addition_indicators(prices, trend_names, status_names)
-            extra_set[file_name] = indicator_dicts
+            indicator_dicts['trend'], indicator_dicts['status'], indicator_dicts['image'] = addition_indicators(prices, trend_names, status_names, image_names)
             # data regularize
-            prices_ = data_regularize(prices, indicator_dicts['trend'], indicator_dicts['status'])
-            train_set_, test_set_ = spliter.split_data(prices_, percentage=percentage)
-            update_cutoff(indicator_dicts['trend'], indicator_dicts['status'], spliter.offset)
+            # prices_ = data_regularize(prices, indicator_dicts['trend'], indicator_dicts['status'])
+            train_set_, test_set_ = spliter.split_data(prices, percentage=percentage)
+            update_cutoff(indicator_dicts['trend'], indicator_dicts['status'], indicator_dicts['image'], spliter.offset)
+            extra_set[file_name] = indicator_dicts
         else:
             train_set_, test_set_ = spliter.split_data(prices, percentage=percentage)
         train_set[file_name] = train_set_
         test_set[file_name] = test_set_
+        # split the date
         train_date[file_name], test_date[file_name] = dates[:spliter.offset], dates[spliter.offset:]
 
     print("Totally, read done, got %d rows, %d filtered, %d open prices adjusted" % (

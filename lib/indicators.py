@@ -171,3 +171,29 @@ class RSI:
         # target_data = np.ndarray(shape=((end-start), self.encoded_size),dtype=np.float64)
         target_data = self.rsi_value[start:end] / 100
         return target_data.reshape(-1,self.encoded_size)
+
+
+class moving_average:  # 2d_data
+    def __init__(self, target_price, periods):
+        self.target_price = target_price
+        self.periods = periods  # [2,3,4,5,6,7,8,...,100]
+        self.feature_size = len(periods)
+        self.invalid_len = max(periods)-1
+        self.cutoff = None
+
+    def cal_data(self):
+        self.mas = np.zeros(shape=(self.target_price['close'].shape[0], len(self.periods)), dtype=np.float32)
+        for c, period in enumerate(self.periods):
+            self.mas[:, c] = pd.Series(self.target_price['close']).rolling(period).mean().values
+
+    def getData(self):
+        return {'ma': self.mas}
+
+    def normalise(self, start, end, train_mode):
+        if train_mode is False:
+            start = start + self.cutoff
+            end = end + self.cutoff
+        min = np.min(self.mas[start:end, :])
+        max = np.max(self.mas[start:end, :])
+        target_data = (self.mas[start:end, :] - min) / (max - min)
+        return target_data  # 2d image (20,100)
