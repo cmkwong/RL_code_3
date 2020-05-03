@@ -1,12 +1,12 @@
 import os
 
-from gym import wrappers
-import ptan
+# from gym import wrappers
+# import ptan
 import numpy as np
 import torch
 import torch.optim as optim
 
-from lib import environ, data, models, common, validation
+from lib import environ, data, models, common, validation, agents, actions, experience
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -16,7 +16,7 @@ from datetime import datetime
 now = datetime.now()
 dt_string = now.strftime("%y%m%d_%H%M%S")
 
-BATCH_SIZE = 64
+BATCH_SIZE = 128
 BARS_COUNT = 20
 TARGET_NET_SYNC = 1000
 TRAINING_DATA = ""
@@ -29,7 +29,7 @@ REPLAY_INITIAL = 10000 # 10000
 
 REWARD_STEPS = 2
 
-LEARNING_RATE = 0.00002
+LEARNING_RATE = 0.00004
 
 STATES_TO_EVALUATE = 1000
 EVAL_EVERY_STEP = 1000
@@ -44,10 +44,10 @@ VALIDATION_EVERY_STEP = 30000 # 30000
 WEIGHT_VISUALIZE_STEP = 50000
 
 loss_v = None
-load_net = True
+load_net = False
 TRAIN_ON_GPU = True
 
-MAIN_PATH = "../docs/9"
+MAIN_PATH = "../docs/10"
 DATA_LOAD_PATH = MAIN_PATH + "/data"
 NET_SAVE_PATH = MAIN_PATH + "/checkpoint"
 RECORD_SAVE_PATH = MAIN_PATH + "/records"
@@ -55,10 +55,6 @@ RUNS_SAVE_PATH = MAIN_PATH + "/runs/" + dt_string
 NET_FILE = "checkpoint-900000.data"
 
 if __name__ == "__main__":
-    if TRAIN_ON_GPU:
-        device = torch.device("cuda")
-    else:
-        device = torch.device("cpu")
 
     # create the training, val set, trend_set, status_dicts
     train_set, val_set, train_date, val_date, extra_set = data.read_bundle_csv(
@@ -67,28 +63,28 @@ if __name__ == "__main__":
         trend_names=['bollinger_bands', 'MACD', 'RSI'], image_names=['MA'])
 
     env = environ.StocksEnv(train_set, train_date, extra_set, bars_count=BARS_COUNT, reset_on_close=True, random_ofs_on_reset=True, reward_on_close=False, volumes=False, train_mode=True)
-    env = wrappers.TimeLimit(env, max_episode_steps=1000)
+    # env = wrappers.TimeLimit(env, max_episode_steps=1000)
     env_val = environ.StocksEnv(val_set, val_date, extra_set, bars_count=BARS_COUNT, reset_on_close=True, random_ofs_on_reset=True, reward_on_close=False, volumes=False, train_mode=False)
     # env_val = wrappers.TimeLimit(env_val, max_episode_steps=1000)
 
     # create neural network
     net = models.DoubleLSTM(env=env, n_hidden=256, n_layers=2, rnn_drop_prob=0.2, fc_drop_prob=0.2,
-                            actions_n=3, train_on_gpu=TRAIN_ON_GPU, batch_first=True).to(device)
+                            actions_n=3, train_on_gpu=TRAIN_ON_GPU, batch_first=True)
     # load the network
     if load_net is True:
         with open(os.path.join(NET_SAVE_PATH, NET_FILE), "rb") as f:
             checkpoint = torch.load(f)
         net = models.DoubleLSTM(env=env, n_hidden=256, n_layers=2, rnn_drop_prob=0.2, fc_drop_prob=0.2,
-                                actions_n=3, train_on_gpu=TRAIN_ON_GPU, batch_first=True).to(device)
+                                actions_n=3, train_on_gpu=TRAIN_ON_GPU, batch_first=True)
         net.load_state_dict(checkpoint['state_dict'])
 
-    tgt_net = ptan.agent.TargetNet(net)
+    tgt_net = agents.TargetNet(net)
 
     # create buffer
-    selector = ptan.actions.EpsilonGreedyActionSelector(EPSILON_START)
-    agent = ptan.agent.DQNAgent(net, selector, do_preprocess=False, device=device)
-    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, GAMMA, steps_count=REWARD_STEPS)
-    buffer = ptan.experience.ExperienceReplayBuffer(exp_source, REPLAY_SIZE)
+    selector = actions.EpsilonGreedyActionSelector(EPSILON_START)
+    agent = agents.DQNAgent(net, selector)
+    exp_source = experience.ExperienceSourceFirstLast(env, agent, GAMMA, steps_count=REWARD_STEPS)
+    buffer = experience.ExperienceReplayBuffer(exp_source, REPLAY_SIZE)
 
     # create optimizer
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
@@ -127,10 +123,10 @@ if __name__ == "__main__":
 
             # init the hidden both in network and tgt network
             net_processor.train_mode(batch_size=BATCH_SIZE)
-            loss_v = common.calc_loss(batch, net, tgt_net.target_model, GAMMA ** REWARD_STEPS, device=device)
+            loss_v = common.calc_loss(batch, net, tgt_net.target_model, GAMMA ** REWARD_STEPS, train_on_gpu=TRAIN_ON_GPU)
             loss_v.backward()
             optimizer.step()
-            loss_value = loss_v.clone().detach().cpu().item()
+            loss_value = loss_v.item()
             loss_tracker.loss(loss_value, step_idx)
 
             if step_idx % TARGET_NET_SYNC == 0:

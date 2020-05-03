@@ -80,10 +80,6 @@ class lossTracker:
         if len(self.total_loss) > self.capacity:
             self.total_loss = self.total_loss[1:]
 
-        if frame % 20000 == 0:
-            print("The mean loss is %.2f and the current loss is %.2f" %(
-                movingAverage_loss, mean_loss
-            ))
         self.writer.add_scalar("loss_100", movingAverage_loss, frame)
         self.writer.add_scalar("loss", mean_loss, frame)
 
@@ -113,14 +109,22 @@ def unpack_batch(batch):
            np.array(dones, dtype=np.uint8), last_states
 
 
-def calc_loss(batch, net, tgt_net, gamma, device="cpu"):
+def calc_loss(batch, net, tgt_net, gamma, train_on_gpu):
+    if train_on_gpu:
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
+
     states, actions, rewards, dones, next_states = unpack_batch(batch)
 
     states_v = states
     next_states_v = next_states
-    actions_v = torch.tensor(actions).to(device)
-    rewards_v = torch.tensor(rewards).to(device)
-    done_mask = torch.BoolTensor(dones).to(device)
+    actions_v = torch.tensor(actions, device=device)
+    rewards_v = torch.tensor(rewards, device=device)
+    if train_on_gpu:
+        done_mask = torch.cuda.BoolTensor(dones)
+    else:
+        done_mask = torch.BoolTensor(dones)
 
     state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
     next_state_actions = net(next_states_v).max(1)[1]

@@ -249,39 +249,41 @@ class DoubleLSTM(nn.Module):
         self.hidden_t = None
 
     def get_img1_output_size(self):
-        dump_input = torch.randn((1, self.env.image_sizes[0][0], self.env.image_sizes[0][1])).to(self.device).permute(0, 2, 1)
+        dump_input = torch.randn((1, self.env.image_sizes[0][0], self.env.image_sizes[0][1]), device=self.device).permute(0, 2, 1)
         out_ = self.conv1d(dump_input)
         out = out_.permute(0, 2, 1).contiguous().view(1, -1)
         self.img1_output_size = out.shape[1]
 
-    def preprocessor(self, x): # dtype = torch.float32 must be set
+    def preprocessor(self, states):  # dtype = torch.float32 must be set
+
         price_data = None
         trend_data = None
         image1_data = None
         status_data = None
-        if len(x) == 1:
-            price_data = torch.tensor(np.expand_dims(x[0].price, 0), dtype=torch.float32).to(self.device)   # data.shape = (1, 40, 4)
-            trend_data = torch.tensor(np.expand_dims(x[0].trend, 0), dtype=torch.float32).to(self.device)   # data.shape = (1, 40, 4)
-            image1_data = torch.tensor(np.expand_dims(x[0].image1, 0), dtype=torch.float32).to(self.device).permute(0, 2, 1) # data.shape = (1, 100, 80)
-            status_data = torch.tensor(x[0].status, dtype=torch.float32).to(self.device)                  # status.shape = (1,2)
-        elif len(x) > 1:
-            price_data_shape = (self.batch_size, x[0].price.shape[0], x[0].price.shape[1]) # data.shape = (batch_size, 40, 4)
-            trend_data_shape = (self.batch_size, x[0].trend.shape[0], x[0].trend.shape[1])  # data.shape = (batch_size, 40, 4)
-            image1_data_shape = (self.batch_size, x[0].image1.shape[0], x[0].image1.shape[1])   # image1.shape = (batch_size, 80, 100)
-            status_data_shape = (self.batch_size, x[0].status.shape[1])  # status.shape = (batch_size,2)
+
+        if len(states) == 1:
+            price_data = torch.tensor(np.expand_dims(states[0].price, 0), dtype=torch.float32,device=self.device)  # data.shape = (1, 40, 4)
+            trend_data = torch.tensor(np.expand_dims(states[0].trend, 0), dtype=torch.float32,device=self.device)  # data.shape = (1, 40, 4)
+            image1_data = torch.tensor(np.expand_dims(states[0].image1, 0), dtype=torch.float32, device=self.device).permute(0, 2, 1)  # data.shape = (1, 100, 80)
+            status_data = torch.tensor(states[0].status, dtype=torch.float32, device=self.device)  # status.shape = (1,2)
+        elif len(states) > 1:
+            price_data_shape = (len(states), states[0].price.shape[0], states[0].price.shape[1])  # data.shape = (batch_size, 40, 4)
+            trend_data_shape = (len(states), states[0].trend.shape[0], states[0].trend.shape[1])  # data.shape = (batch_size, 40, 4)
+            image1_data_shape = (len(states), states[0].image1.shape[0], states[0].image1.shape[1])  # image1.shape = (batch_size, 80, 100)
+            status_data_shape = (len(states), states[0].status.shape[1])  # status.shape = (batch_size,2)
             price_data_arr = np.zeros(shape=price_data_shape, dtype=np.float32)
             trend_data_arr = np.zeros(shape=trend_data_shape, dtype=np.float32)
             image1_data_arr = np.zeros(shape=image1_data_shape, dtype=np.float32)
             status_data_arr = np.zeros(shape=status_data_shape, dtype=np.float32)
-            for idx, exp in enumerate(x):
-                price_data_arr[idx, :, :] = np.expand_dims(x[idx].price, 0)
-                trend_data_arr[idx, :, :] = np.expand_dims(x[idx].trend, 0)
-                image1_data_arr[idx, :, :] = np.expand_dims(x[idx].image1, 0)
-                status_data_arr[idx, :] = x[idx].status
-            price_data = torch.tensor(price_data_arr, dtype=torch.float32).to(self.device)
-            trend_data = torch.tensor(trend_data_arr, dtype=torch.float32).to(self.device)
-            image1_data = torch.tensor(image1_data_arr, dtype=torch.float32).to(self.device).permute(0, 2, 1)  # image1.shape = (batch_size, 100, 80)
-            status_data = torch.tensor(status_data_arr, dtype=torch.float32).to(self.device)
+            for idx, exp in enumerate(states):
+                price_data_arr[idx, :, :] = np.expand_dims(states[idx].price, 0)
+                trend_data_arr[idx, :, :] = np.expand_dims(states[idx].trend, 0)
+                image1_data_arr[idx, :, :] = np.expand_dims(states[idx].image1, 0)
+                status_data_arr[idx, :] = states[idx].status
+            price_data = torch.tensor(price_data_arr, dtype=torch.float32, device=self.device)
+            trend_data = torch.tensor(trend_data_arr, dtype=torch.float32, device=self.device)
+            image1_data = torch.tensor(image1_data_arr, dtype=torch.float32, device=self.device).permute(0, 2, 1)  # image1.shape = (batch_size, 100, 80)
+            status_data = torch.tensor(status_data_arr, dtype=torch.float32, device=self.device)
         return price_data, trend_data, image1_data, status_data
 
     def forward(self, x):
@@ -320,11 +322,11 @@ class DoubleLSTM(nn.Module):
         self.batch_size = batch_size
         if (self.train_on_gpu):
             weight = next(self.parameters()).data
-            self.hidden_p = (weight.new_zeros([self.n_layers, batch_size, self.n_hidden]).cuda(),
-                      weight.new_zeros([self.n_layers, batch_size, self.n_hidden]).cuda())
+            self.hidden_p = (weight.new_zeros([self.n_layers, batch_size, self.n_hidden], device=self.device),
+                      weight.new_zeros([self.n_layers, batch_size, self.n_hidden], device=self.device))
             weight = next(self.parameters()).data
-            self.hidden_t = (weight.new_zeros([self.n_layers, batch_size, self.n_hidden]).cuda(),
-                           weight.new_zeros([self.n_layers, batch_size, self.n_hidden]).cuda())
+            self.hidden_t = (weight.new_zeros([self.n_layers, batch_size, self.n_hidden], device=self.device),
+                           weight.new_zeros([self.n_layers, batch_size, self.n_hidden], device=self.device))
         else:
             weight = next(self.parameters()).data
             self.hidden_p = (weight.new_zeros([self.n_layers, batch_size, self.n_hidden]),
