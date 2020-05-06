@@ -249,7 +249,7 @@ class DoubleLSTM(nn.Module):
         self.hidden_t = None
 
     def get_img1_output_size(self):
-        dump_input = torch.randn((1, self.env.image_sizes[0][0], self.env.image_sizes[0][1]), device=self.device).permute(0, 2, 1)
+        dump_input = torch.randn((1, self.env.image_sizes[0][0], self.env.image_sizes[0][1])).permute(0, 2, 1).to(self.device)
         out_ = self.conv1d(dump_input)
         out = out_.permute(0, 2, 1).contiguous().view(1, -1)
         self.img1_output_size = out.shape[1]
@@ -262,9 +262,9 @@ class DoubleLSTM(nn.Module):
         status_data = None
 
         if len(states) == 1:
-            price_data = torch.tensor(np.expand_dims(states[0].price, 0), dtype=torch.float32,device=self.device)  # data.shape = (1, 40, 4)
-            trend_data = torch.tensor(np.expand_dims(states[0].trend, 0), dtype=torch.float32,device=self.device)  # data.shape = (1, 40, 4)
-            image1_data = torch.tensor(np.expand_dims(states[0].image1, 0), dtype=torch.float32, device=self.device).permute(0, 2, 1)  # data.shape = (1, 100, 80)
+            price_data = torch.tensor(np.expand_dims(states[0].price, 0), dtype=torch.float32, device=self.device)  # data.shape = (1, 40, 4)
+            trend_data = torch.tensor(np.expand_dims(states[0].trend, 0), dtype=torch.float32, device=self.device)  # data.shape = (1, 40, 4)
+            image1_data = torch.tensor(np.expand_dims(states[0].image1, 0), dtype=torch.float32, device=self.device).permute(0, 2, 1) # data.shape = (1, 100, 80)
             status_data = torch.tensor(states[0].status, dtype=torch.float32, device=self.device)  # status.shape = (1,2)
         elif len(states) > 1:
             price_data_shape = (len(states), states[0].price.shape[0], states[0].price.shape[1])  # data.shape = (batch_size, 40, 4)

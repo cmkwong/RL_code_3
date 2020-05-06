@@ -47,7 +47,7 @@ loss_v = None
 load_net = False
 TRAIN_ON_GPU = True
 
-MAIN_PATH = "../docs/10"
+MAIN_PATH = "../docs/11"
 DATA_LOAD_PATH = MAIN_PATH + "/data"
 NET_SAVE_PATH = MAIN_PATH + "/checkpoint"
 RECORD_SAVE_PATH = MAIN_PATH + "/records"
