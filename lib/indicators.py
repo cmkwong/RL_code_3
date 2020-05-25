@@ -176,7 +176,7 @@ class RSI:
 class moving_average:  # 2d_data
     def __init__(self, target_price, periods):
         self.target_price = target_price
-        self.periods = periods  # [2,3,4,5,6,7,8,...,100]
+        self.periods = periods  # [1, 2,3,4,5,6,7,8,...,100]
         self.feature_size = len(periods)
         self.invalid_len = max(periods)-1
         self.cutoff = None

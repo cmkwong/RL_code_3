@@ -1,13 +1,11 @@
 import numpy as np
 
-
 class ActionSelector:
     """
     Abstract class which converts scores to the actions
     """
     def __call__(self, scores):
         raise NotImplementedError
-
 
 class ArgmaxActionSelector(ActionSelector):
     """
@@ -16,7 +14,6 @@ class ArgmaxActionSelector(ActionSelector):
     def __call__(self, scores):
         assert isinstance(scores, np.ndarray)
         return np.argmax(scores, axis=1)
-
 
 class EpsilonGreedyActionSelector(ActionSelector):
     def __init__(self, epsilon=0.05, selector=None):

@@ -1,6 +1,7 @@
 import sys
 import time
 import numpy as np
+import pandas as pd
 import re
 
 import torch
@@ -168,19 +169,43 @@ def weight_visualize(net, writer):
         writer.add_histogram(name, param)
 
 def valid_result_visualize(stats=None, writer=None, step_idx=None):
+
     # output the mean reward to the writer
     for key, vals in stats.items():
-        if (len(stats[key]) > 0) and (np.mean(vals) != 0):
+        if (len(vals) > 0):
             mean_value = np.mean(vals)
             std_value = np.std(vals, ddof=1)
-            writer.add_scalar(key + "_val", mean_value, step_idx)
-            writer.add_scalar(key + "_std_val", std_value, step_idx)
+            writer.add_scalar("val_" + key, mean_value, step_idx)
+            writer.add_scalar("std_val_" + key, std_value, step_idx)
             if (key == 'order_profits') or (key == 'episode_reward'):
-                writer.add_histogram(key + "dist_val", np.array(vals))
+                writer.add_histogram("1_dist_val_" + key, np.array(vals))
         else:
-            writer.add_scalar(key + "_val", 0, step_idx)
-            writer.add_scalar(key + "_std_val", 0, step_idx)
+            writer.add_scalar("val_" + key, 0, step_idx)
+            writer.add_scalar("std_val_" + key, 0, step_idx)
             if (key == 'order_profits') or (key == 'episode_reward'):
-                writer.add_histogram(key + "_val", 0)
+                writer.add_histogram("1_dist_val_" + key, 0)
 
-    # output the reward distribution to the writer
+class monitor:
+    def __init__(self, buffer):
+        self.buffer = buffer
+
+    def unpack(self, exps):
+        dates = []
+        actions = []
+        for exp in exps:
+            dates.append(exp.state.date)
+            actions.append(exp.action)
+        return dates, actions
+
+    def generate_into_df(self, monitor_size):
+        samples = self.buffer.sample(monitor_size)
+        dates, actions = self.unpack(samples)
+        dates_sr = pd.Series(dates, name="date")
+        actions_sr = pd.Series(actions, name="action")
+        df = pd.concat([dates_sr, actions_sr], axis=1)
+        return df
+
+    def out_csv(self, monitor_size, step_idx, save_path):
+        path_csv = save_path + "/buffer_" + str(step_idx) + ".csv"
+        df = self.generate_into_df(monitor_size)
+        df.to_csv(path_csv, index=False)

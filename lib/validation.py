@@ -19,10 +19,10 @@ class validator:
         }
         self.df = pd.DataFrame(
             columns=['episode', 'buy_sell', 'order_date', 'order_position', 'close_date', 'close_position',
-                     'position_steps', 'order_profit', "profit_timeCost"])
+                     'position_steps', 'order_profit', "order_profit-timeCost"])
         self.df_row = pd.DataFrame(data=np.full((1, 9), ''),
                               columns=['episode', 'buy_sell', 'order_date', 'order_position', 'close_date',
-                                       'close_position', 'position_steps', 'order_profit', "profit_timeCost"])
+                                       'close_position', 'position_steps', 'order_profit', "order_profit-timeCost"])
         self.path_csv = self.save_path + "/record_" + str(step_idx) + ".csv"
         # date_list for that env
         self.date_list = self.env._state._date
@@ -54,7 +54,7 @@ class validator:
         self.df_row['close_position'] = self.current_price
         self.df_row['position_steps'] = self.position_steps
         self.df_row['order_profit'] = self.profit
-        self.df_row['profit_timeCost'] = self.profit - self.time_cost
+        self.df_row['order_profit-timeCost'] = self.profit - self.time_cost
 
     def update_df(self):
         self.df = self.df.append(self.df_row)
@@ -84,7 +84,7 @@ class validator:
 
                 self.current_price = self.env._state._price['close'][self.env._state._offset]  # base_offset = 8308
 
-                if (action == environ.Actions.Buy) and (self.buy_position is None) and (self.sell_position is None):
+                if (action == environ.Actions.Buy) and (self.buy_position is None):
                     self.buy_position = self.current_price
                     self.position_steps = 0
                     # store the data
@@ -103,35 +103,14 @@ class validator:
                     # reset the value
                     self.buy_position = None
                     self.position_steps = None
-                '''
-                elif (action == environ.Actions.Sell) and (self.buy_position is None) and (self.sell_position is None):
-                    self.sell_position = self.current_price
-                    self.position_steps = 0
-                    # store the data
-                    self.update_dfrow_open("sell")
-                '''
-                '''
-                elif action == environ.Actions.Sell_close and self.sell_position is not None:
-                    self.cal_profit('sell_close')
-                    self.stats['order_profits'].append(self.profit)
-                    self.stats['order_steps'].append(self.position_steps)
 
-                    # store the data
-                    self.update_dfrow_close('sell', episode=episode)
-                    # stack into df
-                    self.update_df()
-
-                    # reset the value
-                    self.sell_position = None
-                    self.position_steps = None
-                '''
                 obs, reward, done, _ = self.env.step(action_idx)
                 self.total_reward += reward
                 self.episode_steps += 1
                 if self.position_steps is not None:
                     self.position_steps += 1
                     self.time_cost += self.env._state.time_cost(self.position_steps)
-                if done:  # if env._state.reset_on_close is True, mostly cal profit here. Otherwise, this is for having been on position but not closed yet, until the data ended.
+                if done:
                     if self.buy_position is not None:
                         self.cal_profit('buy_close')
                         self.stats['order_profits'].append(self.profit)
@@ -141,17 +120,6 @@ class validator:
                         self.update_dfrow_close('buy', episode=episode)
                         # stack into df and clear the df_row
                         self.update_df()
-                    '''
-                    elif self.sell_position is not None:
-                        self.cal_profit('sell_close')
-                        self.stats['order_profits'].append(self.profit)
-                        self.stats['order_steps'].append(self.position_steps)
-
-                        # store the data (have not sell yet but reached end-date)
-                        self.update_dfrow_close('sell', episode=episode)
-                        # stack into df and clear the df_row
-                        self.update_df()
-                    '''
                     break
             self.stats['episode_reward'].append(self.total_reward)
             self.stats['episode_steps'].append(self.episode_steps)

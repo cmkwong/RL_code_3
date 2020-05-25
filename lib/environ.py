@@ -110,7 +110,7 @@ class State:
         """
         Convert current state into numpy array.
         """
-        encoded_data = collections.namedtuple('encoded_data', field_names=['price', 'trend', 'image1', 'status'])
+        encoded_data = collections.namedtuple('encoded_data', field_names=['date', 'price', 'trend', 'image1', 'status'])
         price = np.ndarray(shape=self.shape_price, dtype=np.float32)
         trend = np.ndarray(shape=self.shape_trend, dtype=np.float32)
         status = np.ndarray(shape=self.shape_status, dtype=np.float32)
@@ -156,8 +156,11 @@ class State:
                 pass
             if len(self._extra_set['image']) is not 0:
                 images = self.normalised_image_data(images)
-        return encoded_data(price=price, trend=trend, image1=images[0], status=status)
 
+        # date
+        date = self._date[self._offset]
+
+        return encoded_data(date=date, price=price, trend=trend, image1=images[0], status=status)
 
     def _cur_close(self):
         """

@@ -64,6 +64,32 @@ class DQNAgent(BaseAgent):
         actions = self.action_selector(q)
         return actions, agent_states
 
+class Supervised_DQNAgent(BaseAgent):
+    def __init__(self, dqn_model, action_selector, sample_sheet, assistance_ratio=0.2):
+        self.dqn_model = dqn_model
+        self.action_selector = action_selector
+        self.sample_sheet = sample_sheet
+        self.assistance_ratio = assistance_ratio
+
+    def __call__(self, states, agent_states=None):
+        batch_size = len(states)
+        if agent_states is None:
+            agent_states = [None] * batch_size
+        sample_mask = np.random.random(batch_size) <= self.assistance_ratio
+        sample_actions_ = []
+        dates = [state.date for state in states[sample_mask]]
+        for date in dates:
+            for i, d in enumerate(self.sample_sheet.date):
+                if d == date:
+                    sample_actions_.append(self.sample_sheet.action[i])
+        sample_actions = np.array(sample_actions_)   # convert into array
+
+        q_v = self.dqn_model(states)
+        q = q_v.data.cpu().numpy()
+        actions = self.action_selector(q)
+        actions[sample_mask] = sample_actions
+        return actions, agent_states
+
 class TargetNet:
     """
     Wrapper around model which provides copy of it instead of trained weights

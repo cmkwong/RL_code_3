@@ -19,6 +19,7 @@ dt_string = now.strftime("%y%m%d_%H%M%S")
 BATCH_SIZE = 128
 BARS_COUNT = 20
 TARGET_NET_SYNC = 1000
+MONITOR_BUFFER_SIZE = 10000
 TRAINING_DATA = ""
 VAL_DATA = ""
 
@@ -29,30 +30,32 @@ REPLAY_INITIAL = 10000 # 10000
 
 REWARD_STEPS = 2
 
-LEARNING_RATE = 0.00004
+LEARNING_RATE = 0.00008
 
 STATES_TO_EVALUATE = 1000
 EVAL_EVERY_STEP = 1000
 
-EPSILON_START = 0.9
+EPSILON_START = 1.0
 EPSILON_STOP = 0.15
 EPSILON_STEPS = 1000000
 MAX_VALIDATION_EPISODES = 600
 
-CHECKPOINT_EVERY_STEP = 50000
 VALIDATION_EVERY_STEP = 30000 # 30000
+CHECKPOINT_EVERY_STEP = VALIDATION_EVERY_STEP * 2 # 60000
 WEIGHT_VISUALIZE_STEP = 50000
+BUFFER_MONITOR_STEP = REPLAY_SIZE   # 100000
 
 loss_v = None
 load_net = False
 TRAIN_ON_GPU = True
 
-MAIN_PATH = "../docs/11"
+MAIN_PATH = "../docs/12"
 DATA_LOAD_PATH = MAIN_PATH + "/data"
 NET_SAVE_PATH = MAIN_PATH + "/checkpoint"
-RECORD_SAVE_PATH = MAIN_PATH + "/records"
+VAL_SAVE_PATH = MAIN_PATH + "/monitor_validations"
+BUFFER_SAVE_PATH = MAIN_PATH + "/monitor_buffers"
 RUNS_SAVE_PATH = MAIN_PATH + "/runs/" + dt_string
-NET_FILE = "checkpoint-900000.data"
+NET_FILE = "checkpoint-1450000.data"
 
 if __name__ == "__main__":
 
@@ -64,7 +67,7 @@ if __name__ == "__main__":
 
     env = environ.StocksEnv(train_set, train_date, extra_set, bars_count=BARS_COUNT, reset_on_close=True, random_ofs_on_reset=True, reward_on_close=False, volumes=False, train_mode=True)
     # env = wrappers.TimeLimit(env, max_episode_steps=1000)
-    env_val = environ.StocksEnv(val_set, val_date, extra_set, bars_count=BARS_COUNT, reset_on_close=True, random_ofs_on_reset=True, reward_on_close=False, volumes=False, train_mode=False)
+    env_val = environ.StocksEnv(val_set, val_date, extra_set, bars_count=BARS_COUNT, reset_on_close=False, random_ofs_on_reset=False, reward_on_close=False, volumes=False, train_mode=False)
     # env_val = wrappers.TimeLimit(env_val, max_episode_steps=1000)
 
     # create neural network
@@ -101,7 +104,10 @@ if __name__ == "__main__":
     best_mean_val = None
 
     # create the validator
-    validator = validation.validator(env_val, net, save_path=RECORD_SAVE_PATH, comission=0.1)
+    validator = validation.validator(env_val, net, save_path=VAL_SAVE_PATH, comission=0.1)
+
+    # create the monitor
+    monitor = common.monitor(buffer)
 
     writer = SummaryWriter(log_dir=RUNS_SAVE_PATH, comment="USDJPY_2020")
     loss_tracker = common.lossTracker(writer, group_losses=100)
@@ -142,7 +148,7 @@ if __name__ == "__main__":
 
             if step_idx % VALIDATION_EVERY_STEP == 0:
                 net_processor.eval_mode(batch_size=1)
-                validation_episodes = min(np.int((1/1800)*step_idx + 100), MAX_VALIDATION_EPISODES)
+                validation_episodes = 5
                 writer.add_scalar("validation_episodes", validation_episodes, step_idx)
 
                 val_epsilon = max(0, EPSILON_START - step_idx * 0.75 / EPSILON_STEPS)
@@ -152,3 +158,6 @@ if __name__ == "__main__":
             if step_idx % WEIGHT_VISUALIZE_STEP == 0:
                 net_processor.eval_mode(batch_size=1)
                 common.weight_visualize(net, writer)
+
+            if step_idx % BUFFER_MONITOR_STEP == 0:
+                monitor.out_csv(MONITOR_BUFFER_SIZE, step_idx, BUFFER_SAVE_PATH)

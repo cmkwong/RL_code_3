@@ -210,6 +210,12 @@ class ExperienceReplayBuffer:
         keys = np.random.choice(len(self.buffer), batch_size, replace=True)
         return [self.buffer[key] for key in keys]
 
+    def buffer_sample(self, monitor_size):
+        if len(self.buffer) <= monitor_size:
+            return self.buffer
+        keys = np.random.choice(len(self.buffer), monitor_size, replace=True)
+        return [self.buffer[key] for key in keys]
+
     def _add(self, sample):
         if len(self.buffer) < self.capacity:
             self.buffer.append(sample)
