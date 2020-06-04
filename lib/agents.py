@@ -68,7 +68,7 @@ class Supervised_DQNAgent(BaseAgent):
     def __init__(self, dqn_model, action_selector, sample_sheet, assistance_ratio=0.2):
         self.dqn_model = dqn_model
         self.action_selector = action_selector
-        self.sample_sheet = sample_sheet
+        self.sample_sheet = sample_sheet # name tuple
         self.assistance_ratio = assistance_ratio
 
     def __call__(self, states, agent_states=None):

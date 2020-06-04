@@ -49,13 +49,14 @@ loss_v = None
 load_net = False
 TRAIN_ON_GPU = True
 
-MAIN_PATH = "../docs/12"
+MAIN_PATH = "../docs/13"
 DATA_LOAD_PATH = MAIN_PATH + "/data"
+SAMPLE_LOAD_PATH = MAIN_PATH + "/sample"
 NET_SAVE_PATH = MAIN_PATH + "/checkpoint"
 VAL_SAVE_PATH = MAIN_PATH + "/monitor_validations"
 BUFFER_SAVE_PATH = MAIN_PATH + "/monitor_buffers"
 RUNS_SAVE_PATH = MAIN_PATH + "/runs/" + dt_string
-NET_FILE = "checkpoint-1450000.data"
+NET_FILE = "checkpoint-900000.data"
 
 if __name__ == "__main__":
 
@@ -64,6 +65,9 @@ if __name__ == "__main__":
         path=DATA_LOAD_PATH,
         sep='\t', filter_data=True, fix_open_price=False, percentage=0.8, extra_indicator=True,
         trend_names=['bollinger_bands', 'MACD', 'RSI'], image_names=['MA'])
+
+    # loading the sample as a namedtuple
+    # sample_sheet = data.read_sample_csv(path=SAMPLE_LOAD_PATH, sep=',')
 
     env = environ.StocksEnv(train_set, train_date, extra_set, bars_count=BARS_COUNT, reset_on_close=True, random_ofs_on_reset=True, reward_on_close=False, volumes=False, train_mode=True)
     # env = wrappers.TimeLimit(env, max_episode_steps=1000)
@@ -86,6 +90,7 @@ if __name__ == "__main__":
     # create buffer
     selector = actions.EpsilonGreedyActionSelector(EPSILON_START)
     agent = agents.DQNAgent(net, selector)
+    # agent = agents.Supervised_DQNAgent(net, selector, sample_sheet, assistance_ratio=0.2)
     exp_source = experience.ExperienceSourceFirstLast(env, agent, GAMMA, steps_count=REWARD_STEPS)
     buffer = experience.ExperienceReplayBuffer(exp_source, REPLAY_SIZE)
 

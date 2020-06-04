@@ -103,6 +103,7 @@ class validator:
                     # reset the value
                     self.buy_position = None
                     self.position_steps = None
+                    self.time_cost = 0
 
                 obs, reward, done, _ = self.env.step(action_idx)
                 self.total_reward += reward

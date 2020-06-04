@@ -4,6 +4,7 @@ import glob
 import numpy as np
 from collections import OrderedDict
 from lib import indicators
+import collections
 
 # Prices = collections.namedtuple('Prices', field_names=['open', 'high', 'low', 'close', 'volume'])
 
@@ -37,7 +38,7 @@ class csv_reader:
                 vals = [row[0]]
                 row_data = list(map(float_available, [row[idx] for idx in indices]))
                 vals.extend(row_data)
-                if filter_data and ((vals[-1] < (1e-8))): # filter out the day when no volume
+                if filter_data and ((vals[-1] < (1e-8)) or (vals[-1] == 1)): # filter out the day when no volume or ==1
                     count_filter += 1
                     continue
 
@@ -190,3 +191,26 @@ def read_bundle_csv(path, sep=',', filter_data=True, fix_open_price=False, perce
         spliter.trainSet_size, spliter.testSet_size))
 
     return train_set, test_set, train_date, test_date, extra_set
+
+def read_sample_csv(path, sep=','):
+    sample_sheet = collections.namedtuple('sample_sheet', field_names=['date', 'action'])
+    file_list = os.listdir(path)
+    file_name = file_list[0]
+    required_path = path + "/" + file_name
+    print("Reading sample sheet. ")
+    with open(file_name, 'rt', encoding='utf-8') as fd:
+        reader = csv.reader(fd, delimiter=sep)
+        header = next(reader)
+        date_list, action_list = [], []
+        count_out = 0
+        for row in reader:
+            date_list.append(row[0])    # date
+            action_list.append(row[1])  # action
+            count_out += 1
+
+        sample_sheet.date = date_list
+        sample_sheet.action = action_list
+        print("Finished sample sheet reading. The row: ", count_out)
+
+        return sample_sheet
+
