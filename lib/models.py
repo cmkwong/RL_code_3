@@ -206,11 +206,11 @@ class DoubleLSTM(nn.Module):
 
         # for state value
         self.fc_val = nn.Sequential(
-            nn.Linear(self.n_hidden*2 + self.img1_output_size + self.status_size, 1024),
+            nn.Linear(self.n_hidden*4 + self.img1_output_size + self.status_size, 1024),
             nn.ReLU(),
-            nn.Dropout(p=self.fc_drop_prob),
-            nn.Linear(1024, 1024),
-            nn.ReLU(),
+            # nn.Dropout(p=self.fc_drop_prob),
+            # nn.Linear(1024, 1024),
+            # nn.ReLU(),
             nn.Dropout(p=self.fc_drop_prob),
             nn.Linear(1024, 512),
             nn.ReLU(),
@@ -226,11 +226,11 @@ class DoubleLSTM(nn.Module):
         ).to(self.device)
         # for action value
         self.fc_adv = nn.Sequential(
-            nn.Linear(self.n_hidden*2 + self.img1_output_size + self.status_size, 1024),
+            nn.Linear(self.n_hidden*4 + self.img1_output_size + self.status_size, 1024),
             nn.ReLU(),
-            nn.Dropout(p=self.fc_drop_prob),
-            nn.Linear(1024, 1024),
-            nn.ReLU(),
+            # nn.Dropout(p=self.fc_drop_prob),
+            # nn.Linear(1024, 1024),
+            # nn.ReLU(),
             nn.Dropout(p=self.fc_drop_prob),
             nn.Linear(1024, 512),
             nn.ReLU(),
@@ -301,13 +301,15 @@ class DoubleLSTM(nn.Module):
         img1_out = img1_out_.contiguous().view(self.batch_size, -1)
 
         # only need the last cell output
-        price_output_ = price_output[:,-1,:]
-        trend_output_ = trend_output[:, -1, :]
-        price_output = price_output_.view(self.batch_size, -1)
-        trend_output = trend_output_.view(self.batch_size, -1)
+        # price_output_ = price_output[:,-1,:]
+        # trend_output_ = trend_output[:, -1, :]
+        # price_output = price_output_.view(self.batch_size, -1)
+        # trend_output = trend_output_.view(self.batch_size, -1)
+        hidden_p_ = self.hidden_p[0].permute(1, 0, 2).contiguous().view(self.batch_size,-1)
+        hidden_t_ = self.hidden_t[0].permute(1, 0, 2).contiguous().view(self.batch_size,-1)
+
         # cat output: shape = po(batch_size, 256) + to(batch_size, 256) + status(batch_size, 2) = (batch_size,514)
-        output_ = torch.cat((price_output, trend_output), dim=1)
-        output_ = torch.cat((output_, img1_out), dim=1)
+        output_ = torch.cat((hidden_p_, hidden_t_, img1_out), dim=1)
         output = torch.cat((output_, status), dim=1)
 
         val = self.fc_val(output)

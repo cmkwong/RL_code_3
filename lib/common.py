@@ -191,18 +191,21 @@ class monitor:
 
     def unpack(self, exps):
         dates = []
+        rewards = []
         actions = []
         for exp in exps:
             dates.append(exp.state.date)
             actions.append(exp.action)
-        return dates, actions
+            rewards.append(exp.reward)
+        return dates, actions, rewards
 
     def generate_into_df(self, monitor_size):
         samples = self.buffer.sample(monitor_size)
-        dates, actions = self.unpack(samples)
+        dates, actions, rewards = self.unpack(samples)
         dates_sr = pd.Series(dates, name="date")
         actions_sr = pd.Series(actions, name="action")
-        df = pd.concat([dates_sr, actions_sr], axis=1)
+        rewards_sr = pd.Series(rewards, name="reward")
+        df = pd.concat([dates_sr, actions_sr, rewards_sr], axis=1)
         return df
 
     def out_csv(self, monitor_size, step_idx, save_path):
