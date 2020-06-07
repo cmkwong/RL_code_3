@@ -42,7 +42,6 @@ def default_states_preprocessor(states):
         np_states = np.array([np.array(s, copy=False) for s in states], copy=False)
     return torch.tensor(np_states)
 
-
 def float32_preprocessor(states):
     np_states = np.array(states, dtype=np.float32)
     return torch.tensor(np_states)
