@@ -4,6 +4,7 @@ from gym.utils import seeding
 import enum
 import numpy as np
 import collections
+import pandas as pd
 
 from . import data
 
@@ -34,13 +35,14 @@ class State:
         self.order_step = 0.0 # for step counter from buy to sell (buy date = step 1, if sell date = 4, time cost = 3)
         self.bars_count_images = [80]  # [80 days, 200 days, ...]
 
-    def reset(self, price, date, extra_set, offset):
+    def reset(self, price, date, extra_set, offset, ma_reward):
         assert isinstance(price, dict)
         assert offset >= self.bars_count - 1
         self.have_position = False
         self.open_price = 0.0
         self._price = price
         self._date = date
+        self._ma_reward = ma_reward
         self._extra_set = extra_set     # empty if {}
         self.extra_indicator = False
         self._offset = offset
@@ -185,7 +187,8 @@ class State:
         reward = 0.0
         done = False
         # don't need self._cur_close() because it is not relative price
-        close = self._price['close'][self._offset]
+        #close = self._price['close'][self._offset]
+        close = self._ma_reward[self._offset]
         if action == Actions.Buy and not self.have_position:
             self.have_position = True
             self.open_price = close
@@ -201,17 +204,17 @@ class State:
 
         self._offset += 1
         prev_close = close
-        close = self._price['close'][self._offset]
-        done |= self._offset >= self._price['close'].shape[0]-1 # done if reached limit
+        #close = self._price['close'][self._offset]
+        close = self._ma_reward[self._offset]
+        done |= self._offset >= self._price['close'].shape[0] - 1  # done if reached limit
 
         if self.have_position and not self.reward_on_close:
-            reward += 100.0 * (close - prev_close) / prev_close # change with respect to last day close-price
+            reward += 100.0 * (close - prev_close) / prev_close # mean value - reduce the variance
             self.order_step += 1
             one_step_cost = self.time_cost(self.order_step)  # cal the time cost
             reward -= one_step_cost
 
         return reward, done
-
 
 class StocksEnv(gym.Env):
     metadata = {'render.modes': ['human']}
@@ -275,11 +278,12 @@ class StocksEnv(gym.Env):
         self._instrument = self.np_random.choice(list(self.universe_price.keys()))
         price = self.universe_price[self._instrument]
         date = self.universe_date[self._instrument]
+        ma_reward = self.get_MA_reward(price, 5)            # get the moving average reward
         extra_set_ = {}
         if len(self.universe_extra_set) is not 0:
             extra_set_ = self.universe_extra_set[self._instrument]
         offset = self.offset_modify(price, extra_set_, self.train_mode) # train_mode=False, random offset is different
-        self._state.reset(price, date, extra_set_, offset)
+        self._state.reset(price, date, extra_set_, offset, ma_reward)
         return self._state.encode()
 
     def step(self, action_idx):
@@ -289,11 +293,10 @@ class StocksEnv(gym.Env):
         info = {"instrument": self._instrument, "offset": self._state._offset}
         return obs, reward, done, info
 
-    def render(self, mode='human', close=False):
-        pass
-
-    def close(self):
-        pass
+    def get_MA_reward(self, price, period):
+        ma_reward = np.zeros(shape=(price['close'].shape[0], ), dtype=np.float32)
+        ma_reward[:] = pd.Series(price['close']).rolling(period).mean().values
+        return ma_reward
 
     def seed(self, seed=None):
         self.np_random, seed1 = seeding.np_random(seed)
